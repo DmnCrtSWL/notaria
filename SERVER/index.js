@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const N8N_WEBHOOK_URL = 'https://dmncrt.app.n8n.cloud/webhook/notaria-asistente';
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://dmncrt.app.n8n.cloud/webhook/notaria-asistente';
 
 app.use(cors({
   origin: ['https://notaria-client.vercel.app', 'http://localhost:5173'],

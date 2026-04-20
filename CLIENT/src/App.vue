@@ -16,7 +16,7 @@ const messages = ref([]);
 const newMessage = ref('');
 const messageContainer = ref(null);
 
-const API_URL = 'https://notaria-server.vercel.app/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://notaria-server.vercel.app/api';
 
 const fetchMessages = async () => {
   try {
