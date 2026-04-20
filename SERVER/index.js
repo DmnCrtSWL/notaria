@@ -8,7 +8,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const N8N_WEBHOOK_URL = 'https://dmncrt.app.n8n.cloud/webhook/notaria-asistente';
 
-app.use(cors());
+app.use(cors({
+  origin: ['https://notaria-client.vercel.app', 'http://localhost:5173'],
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // Session Management
