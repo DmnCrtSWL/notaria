@@ -21,9 +21,17 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://notaria-server.vercel.a
 const fetchMessages = async () => {
   try {
     const response = await axios.get(`${API_URL}/messages`);
-    // Only update if we have new messages to avoid flickering or race conditions
-    if (response.data.length !== messages.value.length) {
-      messages.value = response.data;
+    const serverMessages = response.data;
+    
+    // Check if we need to update:
+    // 1. Length is different
+    // 2. Or the last message ID/text is different
+    const lastLocal = messages.value[messages.value.length - 1];
+    const lastServer = serverMessages[serverMessages.length - 1];
+    
+    if (serverMessages.length !== messages.value.length || 
+        (lastLocal && lastServer && lastLocal.text !== lastServer.text)) {
+      messages.value = serverMessages;
       scrollToBottom();
     }
   } catch (error) {
