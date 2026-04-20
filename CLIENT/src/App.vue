@@ -18,6 +18,23 @@ const messageContainer = ref(null);
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://notaria-server.vercel.app/api';
 
+// --- Session Management ---
+const getOrGenerateSessionID = () => {
+  let id = localStorage.getItem('whatsapp_session_id');
+  if (!id) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    id = '';
+    for (let i = 0; i < 9; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    localStorage.setItem('whatsapp_session_id', id);
+  }
+  return id;
+};
+
+const currentSessionID = ref(getOrGenerateSessionID());
+// --------------------------
+
 const fetchMessages = async () => {
   try {
     const response = await axios.get(`${API_URL}/messages`);
@@ -59,7 +76,10 @@ const sendMessage = async () => {
   scrollToBottom();
 
   try {
-    await axios.post(`${API_URL}/messages`, { text });
+    await axios.post(`${API_URL}/messages`, { 
+      text, 
+      SessionID: currentSessionID.value 
+    });
     // The next fetchMessages will sync the actual server ID
   } catch (error) {
     console.error('Error sending message:', error);
@@ -80,6 +100,7 @@ const resetChat = async () => {
   if (confirm('¿Estás seguro de que quieres reiniciar el chat y generar un nuevo SessionID?')) {
     try {
       await axios.post(`${API_URL}/reset`);
+      localStorage.removeItem('whatsapp_session_id');
       window.location.reload();
     } catch (error) {
       console.error('Error al reiniciar el chat:', error);

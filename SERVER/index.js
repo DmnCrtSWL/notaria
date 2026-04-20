@@ -15,31 +15,6 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Session Management
-let currentSessionID = '';
-let lastSessionGeneration = 0;
-
-const generateSessionID = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 9; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
-const getSessionID = () => {
-  const now = Date.now();
-  const twentyFourHours = 24 * 60 * 60 * 1000;
-
-  if (!currentSessionID || (now - lastSessionGeneration) > twentyFourHours) {
-    currentSessionID = generateSessionID();
-    lastSessionGeneration = now;
-    console.log(`Nueva SessionID generada: ${currentSessionID}`);
-  }
-  return currentSessionID;
-};
-
 // In-memory message store for testing
 let messages = [];
 
@@ -48,13 +23,11 @@ app.get('/api/messages', (req, res) => {
   res.json(messages);
 });
 
-// Reset session and messages (for testing)
+// Reset messages (for testing)
 app.post('/api/reset', (req, res) => {
   messages = [];
-  currentSessionID = '';
-  lastSessionGeneration = 0;
-  console.log('Sistema reiniciado: Mensajes y SessionID borrados.');
-  res.json({ message: 'Chat y sesión reiniciados correctamente' });
+  console.log('Historial de mensajes borrado.');
+  res.json({ message: 'Chat reiniciado correctamente' });
 });
 
 // Receive message FROM n8n (n8n -> WhatsApp UI)
@@ -80,7 +53,7 @@ app.post('/api/webhook', (req, res) => {
 
 // Send message TO n8n (WhatsApp UI -> n8n)
 app.post('/api/messages', async (req, res) => {
-  const { text } = req.body;
+  const { text, SessionID } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
@@ -99,7 +72,7 @@ app.post('/api/messages', async (req, res) => {
   try {
     console.log('Enviando mensaje a n8n...');
     const response = await axios.post(N8N_WEBHOOK_URL, {
-      SessionID: getSessionID(),
+      SessionID: SessionID || 'fallback-id',
       Message: text
     });
     console.log('Mensaje enviado a n8n exitosamente');
