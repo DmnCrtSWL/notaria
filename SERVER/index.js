@@ -102,26 +102,13 @@ app.post('/api/messages', async (req, res) => {
       SessionID: getSessionID(),
       Message: text
     });
-    console.log('Respuesta recibida de n8n');
+    console.log('Mensaje enviado a n8n exitosamente');
     
-    // Check if n8n returned a direct response (Synchronous)
-    // Common pattern in n8n Respond to Webhook is to return an object with the data
+    // Desactivamos la captura síncrona para evitar duplicados al usar el nodo HTTP Request de n8n
+    /*
     const n8nData = Array.isArray(response.data) ? response.data[0] : response.data;
-    
-    if (n8nData && (n8nData.output || n8nData.text)) {
-      const responseText = n8nData.output || n8nData.text;
-      const incomingMsg = {
-        id: messages.length + 1,
-        sender: 'Asistente AI',
-        text: responseText,
-        timestamp: new Date(),
-        incoming: true
-      };
-      messages.push(incomingMsg);
-      console.log('Respuesta de n8n guardada automáticamente:', responseText);
-    }
-    
-    console.log('Mensaje enviado exitosamente a n8n');
+    if (n8nData && (n8nData.output || n8nData.text)) { ... }
+    */
   } catch (error) {
     console.error('Error al enviar mensaje a n8n:', error.message);
   }
