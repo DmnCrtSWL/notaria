@@ -40,14 +40,20 @@ const fetchMessages = async () => {
     const response = await axios.get(`${API_URL}/messages`);
     const serverMessages = response.data;
     
-    // Check if we need to update:
-    // 1. Length is different
-    // 2. Or the last message ID/text is different
+    // Logic to prevent optimistic messages from disappearing:
+    // Only update if:
+    // 1. The server has MORE messages than we have locally.
+    // 2. OR the server has the SAME amount but the content of the last one is different (it became an incoming message).
+    // 3. AND never clear the list if the server returns 0 but we have local messages pending.
+    
     const lastLocal = messages.value[messages.value.length - 1];
     const lastServer = serverMessages[serverMessages.length - 1];
-    
-    if (serverMessages.length !== messages.value.length || 
-        (lastLocal && lastServer && lastLocal.text !== lastServer.text)) {
+
+    const hasNewContent = lastLocal && lastServer && lastLocal.text !== lastServer.text;
+    const serverHasMore = serverMessages.length > messages.value.length;
+    const serverHasSameButDiff = (serverMessages.length === messages.value.length) && hasNewContent;
+
+    if (serverHasMore || serverHasSameButDiff || (messages.value.length === 0 && serverMessages.length > 0)) {
       messages.value = serverMessages;
       scrollToBottom();
     }
