@@ -57,10 +57,20 @@
                     </div>
                   </div>
                   
+                  <!-- Mensaje de error -->
+                  <p v-if="errorMsg" class="text-sm text-center text-error-500 bg-error-50 border border-error-200 rounded-lg px-3 py-2 dark:bg-error-500/10 dark:border-error-500/20">
+                    {{ errorMsg }}
+                  </p>
+
                   <!-- Botón Ingresar -->
                   <div class="pt-2">
-                    <button type="submit" class="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600">
-                      Acceder
+                    <button 
+                      type="submit" 
+                      :disabled="loading"
+                      class="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <span v-if="loading">Verificando...</span>
+                      <span v-else>Acceder</span>
                     </button>
                   </div>
                 </div>
@@ -76,20 +86,45 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import CommonGridShape from '@/components/common/CommonGridShape.vue'
 import FullScreenLayout from '@/components/layout/FullScreenLayout.vue'
+import API_BASE_URL from '@/config/api'
 
 const router = useRouter()
 const usuario = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const errorMsg = ref('')
+const loading = ref(false)
 
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
 }
 
-const handleSubmit = () => {
-  // Redirigir directamente simulando el acceso
-  router.push('/')
+const handleSubmit = async () => {
+  errorMsg.value = ''
+  loading.value = true
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: usuario.value, password: password.value })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      errorMsg.value = data.error || 'Credenciales incorrectas'
+      return
+    }
+
+    // Guardar sesión en localStorage
+    localStorage.setItem('notaria_user', JSON.stringify(data.user))
+    router.push('/almacen')
+  } catch (err) {
+    errorMsg.value = 'No se pudo conectar al servidor.'
+  } finally {
+    loading.value = false
+  }
 }
 </script>

@@ -37,7 +37,7 @@
       <div
         class="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-800"
       >
-        <h5 class="text-lg font-semibold text-gray-800 dark:text-white/90">Notification</h5>
+        <h5 class="text-lg font-semibold text-gray-800 dark:text-white/90">Notificaciones</h5>
 
         <button @click="closeDropdown" class="text-gray-500 dark:text-gray-400">
           <svg
@@ -59,47 +59,47 @@
       </div>
 
       <ul class="flex flex-col h-auto overflow-y-auto custom-scrollbar">
+        <li v-if="notifications.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400">
+          No hay nuevas solicitudes de cita.
+        </li>
         <li v-for="notification in notifications" :key="notification.id" @click="handleItemClick">
           <a
             class="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
             href="#"
           >
-            <span class="relative block w-full h-10 rounded-full z-1 max-w-10">
-              <img :src="notification.userImage" alt="User" class="overflow-hidden rounded-full" />
+            <span class="relative flex items-center justify-center w-10 h-10 rounded-full z-1 max-w-10 bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-400">
+              <!-- Un pequeño icono o inicial -->
+              <span class="font-bold text-lg">{{ notification.client_nombre ? notification.client_nombre.charAt(0).toUpperCase() : 'C' }}</span>
               <span
-                :class="notification.status === 'online' ? 'bg-success-500' : 'bg-error-500'"
-                class="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white dark:border-gray-900"
+                class="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white dark:border-gray-900 bg-orange-500"
               ></span>
             </span>
 
             <span class="block">
               <span class="mb-1.5 block text-theme-sm text-gray-500 dark:text-gray-400">
                 <span class="font-medium text-gray-800 dark:text-white/90">
-                  {{ notification.userName }}
+                  {{ notification.client_nombre || 'Cliente' }}
                 </span>
-                {{ notification.action }}
+                solicitó una cita para
                 <span class="font-medium text-gray-800 dark:text-white/90">
-                  {{ notification.project }}
+                  {{ notification.tramite || 'Trámite' }}
                 </span>
               </span>
 
               <span class="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                <span>{{ notification.type }}</span>
-                <span class="w-1 h-1 bg-gray-400 rounded-full"></span>
-                <span>{{ notification.time }}</span>
+                <span>{{ formatDate(notification.fecha) }} {{ notification.horario ? 'a las ' + notification.horario : '' }}</span>
               </span>
             </span>
           </a>
         </li>
       </ul>
 
-      <router-link
-        to="#"
-        class="mt-3 flex justify-center rounded-lg border border-gray-300 bg-white p-3 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
+      <button
         @click="handleViewAllClick"
+        class="mt-3 flex justify-center w-full rounded-lg border border-gray-300 bg-white p-3 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
       >
-        View All Notification
-      </router-link>
+        Ver Solicitudes en Citas
+      </button>
     </div>
     <!-- Dropdown End -->
   </div>
@@ -107,99 +107,48 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
+import API_BASE_URL from '@/config/api'
 
+const router = useRouter()
 const dropdownOpen = ref(false)
-const notifying = ref(true)
+const notifying = ref(false)
 const dropdownRef = ref(null)
+const notifications = ref([])
+let pollInterval = null
 
-const notifications = ref([
-  {
-    id: 1,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-02.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  {
-    id: 2,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-03.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'offline',
-  },
-  {
-    id: 3,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-04.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  {
-    id: 4,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-05.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  {
-    id: 5,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-06.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'offline',
-  },
-  {
-    id: 6,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-07.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  {
-    id: 7,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-08.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  {
-    id: 7,
-    userName: 'Terry Franci',
-    userImage: '/images/user/user-09.jpg',
-    action: 'requests permission to change',
-    project: 'Project - Nganter App',
-    type: 'Project',
-    time: '5 min ago',
-    status: 'online',
-  },
-  // Add more notifications here...
-])
+const fetchSolicitudes = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/solicitudes`)
+    if (response.ok) {
+      const data = await response.json()
+      notifications.value = data
+      notifying.value = data.length > 0
+    }
+  } catch (error) {
+    console.error('Error al obtener solicitudes para notificaciones:', error)
+  }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const dateObj = new Date(dateStr)
+  // Check if invalid
+  if (isNaN(dateObj.getTime())) {
+    // maybe it's "YYYY-MM-DD" text
+    const parts = dateStr.split('-')
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    return dateStr
+  }
+  return dateObj.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' })
+}
 
 const toggleDropdown = () => {
   dropdownOpen.value = !dropdownOpen.value
-  notifying.value = false
+  if (dropdownOpen.value) {
+    // Opcional: Recargar al abrir para asegurar frescura
+    fetchSolicitudes()
+  }
 }
 
 const closeDropdown = () => {
@@ -214,23 +163,25 @@ const handleClickOutside = (event) => {
 
 const handleItemClick = (event) => {
   event.preventDefault()
-  // Handle the item click action here
-  console.log('Notification item clicked')
   closeDropdown()
+  router.push('/citas')
 }
 
 const handleViewAllClick = (event) => {
   event.preventDefault()
-  // Handle the "View All Notification" action here
-  console.log('View All Notifications clicked')
   closeDropdown()
+  router.push('/citas')
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  fetchSolicitudes()
+  // Recargar notificaciones cada 30 segundos
+  pollInterval = setInterval(fetchSolicitudes, 30000)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  if (pollInterval) clearInterval(pollInterval)
 })
 </script>

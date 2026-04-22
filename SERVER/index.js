@@ -7,6 +7,8 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://dmncrt.app.n8n.cloud/webhook/notaria-asistente';
+const N8N_CONFIRMAR_CITA_URL = 'https://dmncrt.app.n8n.cloud/webhook/notaria-confirmar-cita';
+const N8N_RECHAZAR_CITA_URL  = 'https://dmncrt.app.n8n.cloud/webhook/notaria-rechazar-cita';
 
 app.use(cors({
   origin: ['https://notaria-client.vercel.app', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
@@ -23,9 +25,7 @@ const pool = new Pool({
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
   port: 5432,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
 
 // Inicializar tabla de Citas
@@ -34,92 +34,187 @@ const initDB = async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Citas (
         id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT,
-        priority TEXT DEFAULT 'Primary',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        client_nombre TEXT NOT NULL,
+        fecha DATE NOT NULL,
+        horario TEXT,
+        telefono TEXT,
+        tramite TEXT,
+        estado TEXT DEFAULT 'pendiente',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('Tabla Citas verificada/creada exitosamente.');
+    console.log('Tabla Citas verificada.');
   } catch (err) {
     console.error('Error al inicializar la base de datos:', err);
   }
 };
 initDB();
 
+// ============================================================
 // --- ENDPOINTS DE CITAS ---
+// ============================================================
 
-// Obtener todas las citas
+// Obtener todas las citas CONFIRMADAS (para el calendario)
 app.get('/api/citas', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM Citas ORDER BY start_date ASC');
-    // Mapear para que coincida con el formato de FullCalendar
-    const events = result.rows.map(row => ({
-      id: row.id.toString(),
-      title: row.title,
-      start: row.start_date,
-      end: row.end_date,
-      extendedProps: { calendar: row.priority }
-    }));
+    const result = await pool.query("SELECT * FROM Citas WHERE estado = 'confirmado' ORDER BY fecha ASC, horario ASC");
+
+    const events = result.rows.map(row => {
+      try {
+        const dateStr = (row.fecha instanceof Date) ? row.fecha.toISOString() : String(row.fecha);
+        const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const start = `${datePart}T${row.horario || '00:00:00'}`;
+        return {
+          id: row.id.toString(),
+          title: row.tramite || 'Cita',
+          start: start,
+          extendedProps: {
+            nombre: row.client_nombre || 'Cliente',
+            celular: row.telefono || ''
+          }
+        };
+      } catch (e) {
+        console.error('Error procesando fila de cita:', e, row);
+        return null;
+      }
+    }).filter(e => e !== null);
+
     res.json(events);
   } catch (err) {
+    console.error('Error en /api/citas:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Crear o actualizar cita
-app.post('/api/citas', async (req, res) => {
-  const { id, title, start, end, extendedProps } = req.body;
-  const priority = extendedProps?.calendar || 'Primary';
+// Obtener todas las citas PENDIENTES (solicitudes)
+app.get('/api/solicitudes', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM Citas WHERE estado = 'pendiente' ORDER BY created_at DESC");
+
+    const normalized = result.rows.map(row => {
+      try {
+        const dateStr = (row.fecha instanceof Date) ? row.fecha.toISOString() : String(row.fecha);
+        const datePart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const start_date = `${datePart}T${row.horario || '00:00:00'}`;
+        return {
+          ...row,
+          title: row.tramite || 'Solicitud',
+          nombre: row.client_nombre || 'Cliente',
+          celular: row.telefono || '',
+          start_date: start_date
+        };
+      } catch (e) {
+        console.error('Error procesando solicitud:', e, row);
+        return null;
+      }
+    }).filter(e => e !== null);
+
+    res.json(normalized);
+  } catch (err) {
+    console.error('Error en /api/solicitudes:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Confirmar o Rechazar solicitud (con integración n8n)
+app.put('/api/solicitudes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // 'confirmed' o 'rejected'
 
   try {
-    if (id && !id.startsWith('tmp-')) { // Si tiene ID real, intentamos actualizar
-      const result = await pool.query(
-        'UPDATE Citas SET title = $1, start_date = $2, end_date = $3, priority = $4 WHERE id = $5 RETURNING *',
-        [title, start, end, priority, id]
+    if (status === 'rejected') {
+      const rejectResult = await pool.query(
+        'UPDATE Citas SET estado = $1 WHERE id = $2 RETURNING *',
+        ['rechazado', id]
       );
-      return res.json(result.rows[0]);
-    } else {
-      // Crear nueva
-      const result = await pool.query(
-        'INSERT INTO Citas (title, start_date, end_date, priority) VALUES ($1, $2, $3, $4) RETURNING *',
-        [title, start, end, priority]
-      );
-      return res.status(201).json(result.rows[0]);
+      return res.json({ message: 'Solicitud rechazada', cita: rejectResult.rows[0] });
     }
+
+    // 1. Actualizar estado en la base de datos
+    const result = await pool.query(
+      'UPDATE Citas SET estado = $1 WHERE id = $2 RETURNING *',
+      ['confirmado', id]
+    );
+    const cita = result.rows[0];
+
+    // 2. Disparar flujo n8n para enviar confirmación al cliente via WhatsApp
+    const n8nPayload = {
+      id: cita.id,
+      nombre: cita.client_nombre,
+      telefono: cita.telefono,
+      tramite: cita.tramite,
+      fecha: cita.fecha,
+      horario: cita.horario,
+      estado: 'confirmado',
+      webhook_destino: 'https://notaria-server.vercel.app/api/webhook'
+    };
+
+    try {
+      await fetch(N8N_CONFIRMAR_CITA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload)
+      });
+      console.log(`✅ Flujo n8n disparado para cita ID ${id} (${cita.client_nombre})`);
+    } catch (n8nErr) {
+      // La cita ya quedó confirmada en DB aunque n8n falle
+      console.error('⚠️ Error al llamar n8n:', n8nErr.message);
+    }
+
+    res.json(cita);
   } catch (err) {
+    console.error('Error al confirmar solicitud:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Eliminar cita
+// Crear cita directamente desde admin
+app.post('/api/citas', async (req, res) => {
+  const { title, start, nombre, celular } = req.body;
+  const [fecha, horario] = start.split('T');
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO Citas (tramite, fecha, horario, client_nombre, telefono, estado) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [title, fecha, horario || '00:00:00', nombre, celular, 'confirmado']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al crear cita:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Eliminar cita del calendario
 app.delete('/api/citas/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM Citas WHERE id = $1', [id]);
     res.sendStatus(204);
   } catch (err) {
+    console.error('Error al eliminar cita:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// In-memory message store for testing
+// ============================================================
+// --- ENDPOINTS DE MENSAJERÍA (Chat / WhatsApp) ---
+// ============================================================
+
 let messages = [];
 
-// Get all messages
 app.get('/api/messages', (req, res) => {
   res.json(messages);
 });
 
-// Reset messages (for testing)
 app.post('/api/reset', (req, res) => {
   messages = [];
   console.log('Historial de mensajes borrado.');
   res.json({ message: 'Chat reiniciado correctamente' });
 });
 
-// Receive message FROM n8n (n8n -> WhatsApp UI)
+// Recibir mensaje DESDE n8n (confirmación de cita u otro mensaje)
 app.post('/api/webhook', (req, res) => {
   const { text, sender } = req.body;
   if (!text) {
@@ -136,11 +231,10 @@ app.post('/api/webhook', (req, res) => {
 
   messages.push(newMessage);
   console.log('Mensaje recibido desde n8n:', newMessage);
-  
   res.status(201).json(newMessage);
 });
 
-// Send message TO n8n (WhatsApp UI -> n8n)
+// Enviar mensaje A n8n (Chat del cliente)
 app.post('/api/messages', async (req, res) => {
   const { text, SessionID } = req.body;
   if (!text) {
@@ -156,30 +250,108 @@ app.post('/api/messages', async (req, res) => {
   };
 
   messages.push(newMessage);
-  
-  // Forward to n8n
+
   try {
     console.log('Enviando mensaje a n8n...');
-    const response = await axios.post(N8N_WEBHOOK_URL, {
+    await axios.post(N8N_WEBHOOK_URL, {
       SessionID: SessionID || 'fallback-id',
       Message: text
     });
     console.log('Mensaje enviado a n8n exitosamente');
-    
-    // Desactivamos la captura síncrona para evitar duplicados al usar el nodo HTTP Request de n8n
-    /*
-    const n8nData = Array.isArray(response.data) ? response.data[0] : response.data;
-    if (n8nData && (n8nData.output || n8nData.text)) { ... }
-    */
   } catch (error) {
     console.error('Error al enviar mensaje a n8n:', error.message);
   }
-  
+
   res.status(201).json(newMessage);
 });
 
+// ============================================================
+// ============================================================
+// --- ENDPOINTS DE USUARIOS ---
+// ============================================================
+
+// Login: validar credenciales contra la tabla usuarios
+app.post('/api/login', async (req, res) => {
+  const { usuario, password } = req.body;
+  if (!usuario || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  try {
+    // La tabla usa columnas con mayúsculas ("Usuario", "Contraseña")
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE "Usuario" = $1 AND "Contraseña" = $2 LIMIT 1',
+      [usuario, password]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const user = result.rows[0];
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        nombre: user.Nombre || user.nombre,
+        usuario: user.Usuario || user.usuario,
+        correo: user.Correo || user.correo,
+        rol: user.Rol || user.rol
+      }
+    });
+  } catch (err) {
+    console.error('Error en login:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+
+app.get('/api/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM usuarios ORDER BY id ASC');
+    const normalized = result.rows.map(row => ({
+      id: row.id,
+      nombre: row.Nombre || row.nombre,
+      usuario: row.Usuario || row.usuario,
+      correo: row.Correo || row.correo,
+      rol: row.Rol || row.rol,
+      created_at: row.created_at
+    }));
+    res.json(normalized);
+  } catch (err) {
+    console.error('Error al obtener usuarios:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/usuarios', async (req, res) => {
+  const { nombre, usuario, correo, password, rol } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO usuarios ("Nombre", "Usuario", "Correo", "Contraseña", "Rol") VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nombre, usuario, correo, password, rol]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al crear usuario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://127.0.0.1:${PORT}`);
   console.log(`Conectado a n8n en: ${N8N_WEBHOOK_URL}`);
 });
-

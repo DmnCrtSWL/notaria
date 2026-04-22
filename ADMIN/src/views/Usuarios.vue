@@ -65,7 +65,7 @@
                   <button class="p-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 transition-colors" title="Editar">
                     <Pencil class="w-4 h-4" />
                   </button>
-                  <button class="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 hover:text-error-600 dark:bg-error-500/10 dark:hover:bg-error-500/20 transition-colors" title="Borrar">
+                  <button @click="deleteUser(user.id)" class="p-1.5 rounded-lg bg-error-50 text-error-500 hover:bg-error-100 hover:text-error-600 dark:bg-error-500/10 dark:hover:bg-error-500/20 transition-colors" title="Borrar">
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
@@ -137,19 +137,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { Eye, Pencil, Trash2 } from "lucide-vue-next";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
 import Modal from "@/components/ui/Modal.vue";
+import API_BASE_URL from "@/config/api";
 
 const currentPageTitle = ref("Usuarios");
 
-// Logic Mockup
-const users = ref([
-  { nombre: "Elmer Mendoza", correo: "elmer@example.com", usuario: "elmerm", rol: "Sistemas" },
-  { nombre: "Elena Rojas", correo: "elena@example.com", usuario: "elenar", rol: "Administrador" }
-]);
-
+const users = ref([]);
 const isModalOpen = ref(false);
 
 const formData = ref({
@@ -160,6 +156,21 @@ const formData = ref({
   confirmPassword: "",
   rol: "Operativo"
 });
+
+onMounted(async () => {
+  await fetchUsers();
+});
+
+const fetchUsers = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/usuarios`);
+    if (response.ok) {
+      users.value = await response.json();
+    }
+  } catch (err) {
+    console.error('Error fetching users:', err);
+  }
+};
 
 const passwordMismatch = computed(() => {
   if (!formData.value.password && !formData.value.confirmPassword) return false;
@@ -182,17 +193,38 @@ const closeModal = () => {
   isModalOpen.value = false;
 };
 
-const saveUser = () => {
+const saveUser = async () => {
   if (passwordMismatch.value) {
     return;
   }
-  // Simulando guardado local
-  users.value.push({
-    nombre: formData.value.nombre,
-    correo: formData.value.correo,
-    usuario: formData.value.usuario,
-    rol: formData.value.rol
-  });
-  closeModal();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData.value)
+    });
+
+    if (response.ok) {
+      await fetchUsers();
+      closeModal();
+    }
+  } catch (err) {
+    console.error('Error saving user:', err);
+  }
+};
+
+const deleteUser = async (id) => {
+  if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/usuarios/${id}`, {
+      method: 'DELETE'
+    });
+    if (response.ok) {
+      await fetchUsers();
+    }
+  } catch (err) {
+    console.error('Error deleting user:', err);
+  }
 };
 </script>

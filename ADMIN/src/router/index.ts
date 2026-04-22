@@ -8,11 +8,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'Ecommerce',
-      component: () => import('../views/Ecommerce.vue'),
-      meta: {
-        title: 'eCommerce Dashboard',
-      },
+      redirect: '/almacen'
     },
     {
       path: '/calendar',
@@ -167,9 +163,26 @@ const router = createRouter({
   ],
 })
 
-export default router
+// Rutas que NO requieren autenticación
+const publicRoutes = ['Signin', 'Signup', '404 Error']
 
 router.beforeEach((to, from, next) => {
-  document.title = `Notaria-Admin | ${to.meta.title}`
+  document.title = `Notaria-Admin | ${to.meta.title || to.name}`
+
+  const isPublic = publicRoutes.includes(to.name as string)
+  const isLoggedIn = !!localStorage.getItem('notaria_user')
+
+  if (!isPublic && !isLoggedIn) {
+    // Guardar ruta destino para redirigir después del login
+    return next({ name: 'Signin' })
+  }
+
+  if (to.name === 'Signin' && isLoggedIn) {
+    // Si ya está autenticado y va al login, mandarlo al inicio
+    return next({ path: '/almacen' })
+  }
+
   next()
 })
+
+export default router

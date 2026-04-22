@@ -47,7 +47,15 @@
             />
           </svg>
         </button>
-        <HeaderLogo />
+        <HeaderLogo class="hidden lg:block" />
+        
+        <!-- Section Title -->
+        <div class="flex items-center ml-4 lg:ml-6 flex-1">
+          <h2 class="text-xl lg:text-2xl font-bold text-gray-800 dark:text-white/90">
+            {{ route.meta.title || route.name }}
+          </h2>
+        </div>
+
         <button
           @click="toggleApplicationMenu"
           class="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
@@ -67,7 +75,6 @@
             />
           </svg>
         </button>
-        <SearchBar />
       </div>
 
       <div
@@ -87,12 +94,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSidebar } from '@/composables/useSidebar'
+import { useRoute } from 'vue-router'
 import ThemeToggler from '../common/ThemeToggler.vue'
-import SearchBar from './header/SearchBar.vue'
 import HeaderLogo from './header/HeaderLogo.vue'
 import NotificationMenu from './header/NotificationMenu.vue'
 import UserMenu from './header/UserMenu.vue'
 
+const route = useRoute()
 const { toggleSidebar, toggleMobileSidebar, isMobileOpen } = useSidebar()
 
 const handleToggle = () => {
