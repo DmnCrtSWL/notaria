@@ -10,7 +10,7 @@
             <p class="text-brand-100 max-w-lg text-sm sm:text-base mb-6">
               Sube, organiza y administra de forma segura tus documentos, expedientes y archivos pesados. Accede a ellos desde cualquier lugar sin saturar tu dispositivo móvil.
             </p>
-            <button class="bg-white text-brand-700 px-6 py-2.5 rounded-full font-semibold hover:bg-brand-50 transition-all shadow-md flex items-center gap-2">
+            <button @click="triggerFileInput" class="bg-white text-brand-700 px-6 py-2.5 rounded-full font-semibold hover:bg-brand-50 transition-all shadow-md flex items-center gap-2">
               <UploadCloud class="w-5 h-5" /> Subir Archivos
             </button>
           </div>
@@ -62,14 +62,27 @@
         </div>
       </div>
 
+      <!-- Input oculto de archivos -->
+      <input ref="fileInputRef" type="file" class="hidden" @change="uploadToS3" />
+
       <!-- Drag & Drop Zone -->
-      <div class="w-full border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/20 rounded-2xl p-10 flex flex-col items-center justify-center transition-colors cursor-pointer group">
+      <div
+        class="w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-colors cursor-pointer group"
+        :class="uploading
+          ? 'border-brand-400 bg-brand-50/50 dark:bg-brand-500/10 animate-pulse'
+          : 'border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/20'"
+        @click="triggerFileInput"
+        @dragover.prevent
+        @drop.prevent="handleDrop"
+      >
         <div class="w-16 h-16 bg-brand-100 dark:bg-brand-500/20 text-brand-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
           <UploadCloud class="w-8 h-8" />
         </div>
-        <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">Arrastra tus archivos aquí</h4>
+        <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">
+          {{ uploading ? 'Subiendo archivo...' : 'Arrastra tus archivos aquí' }}
+        </h4>
         <p class="text-sm text-gray-500 text-center max-w-sm">
-          Soporta todo tipo de archivos como PDF, DOCX, XLSX, y medios visuales de hasta 500MB por archivo.
+          {{ uploading ? uploadStatus : 'Soporta PDF, DOCX, XLSX, imágenes y más. Haz clic o arrastra para subir.' }}
         </p>
       </div>
 
@@ -82,16 +95,23 @@
               <div :class="['p-3 rounded-lg', file.colorClass]">
                 <component :is="file.icon" class="w-6 h-6" />
               </div>
-              <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreVertical class="w-5 h-5" />
-              </button>
+              <span v-if="file.isNew" class="text-[10px] font-bold bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400 px-2 py-0.5 rounded-full">Nuevo</span>
             </div>
             
             <h4 class="font-medium text-gray-800 dark:text-white/90 text-sm mb-1 truncate" :title="file.name">{{ file.name }}</h4>
             <div class="flex justify-between items-center mt-auto pt-2">
               <span class="text-xs text-gray-500 dark:text-gray-400">{{ file.size }}</span>
               <div class="flex gap-1">
-                <button class="text-gray-400 hover:text-brand-500 transition-colors p-1" title="Descargar">
+                <a
+                  v-if="file.url"
+                  :href="file.url"
+                  target="_blank"
+                  class="text-gray-400 hover:text-brand-500 transition-colors p-1"
+                  title="Ver / Descargar"
+                >
+                  <Download class="w-4 h-4" />
+                </a>
+                <button v-else class="text-gray-400 hover:text-brand-500 transition-colors p-1" title="Descargar">
                   <Download class="w-4 h-4" />
                 </button>
               </div>
@@ -108,32 +128,130 @@
 import { ref } from "vue";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
 import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, MoreVertical, Download } from "lucide-vue-next";
+import API_BASE_URL from '@/config/api';
 
-// Lógica simulada de archivos recientes
+// ============================================================
+// --- LÓGICA DE SUBIDA A S3 ---
+// ============================================================
+const fileInputRef = ref(null);
+const uploading = ref(false);
+const uploadStatus = ref('');
+
+const triggerFileInput = () => {
+  if (!uploading.value) fileInputRef.value?.click();
+};
+
+const handleDrop = (event) => {
+  const file = event.dataTransfer.files[0];
+  if (file) uploadFile(file);
+};
+
+const uploadToS3 = (event) => {
+  const file = event.target.files[0];
+  if (file) uploadFile(file);
+  // Resetear el input para permitir subir el mismo archivo de nuevo
+  event.target.value = '';
+};
+
+const uploadFile = async (file) => {
+  uploading.value = true;
+  uploadStatus.value = `Preparando ${file.name}...`;
+
+  try {
+    // PASO 1: Obtener la URL pre-firmada de nuestra API
+    uploadStatus.value = 'Obteniendo permiso de subida...';
+    const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, fileType: file.type }),
+    });
+
+    if (!response.ok) throw new Error('Error al obtener URL de subida');
+    const { uploadUrl, key } = await response.json();
+
+    // PASO 2: Subir el archivo directamente a AWS S3
+    uploadStatus.value = `Subiendo ${file.name}...`;
+    const result = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type },
+    });
+
+    if (!result.ok) throw new Error('Error al subir a S3');
+
+    // Agregar al listado de recientes
+    const s3PublicUrl = uploadUrl.split('?')[0]; // URL pública sin parámetros
+    recentFiles.value.unshift({
+      name: file.name,
+      size: formatFileSize(file.size),
+      icon: getFileIcon(file.type),
+      colorClass: getFileColorClass(file.type),
+      url: s3PublicUrl,
+      isNew: true,
+    });
+
+    uploadStatus.value = '¡Archivo subido exitosamente!';
+    console.log('Ruta en S3:', key);
+  } catch (error) {
+    console.error('Error al subir:', error);
+    uploadStatus.value = `Error: ${error.message}`;
+  } finally {
+    uploading.value = false;
+    setTimeout(() => { uploadStatus.value = ''; }, 3000);
+  }
+};
+
+// Helpers
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getFileIcon = (mimeType) => {
+  if (mimeType.startsWith('image/')) return ImageIcon;
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return FileSpreadsheet;
+  return FileText;
+};
+
+const getFileColorClass = (mimeType) => {
+  if (mimeType.startsWith('image/')) return 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400';
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500';
+  if (mimeType.includes('pdf')) return 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400';
+  return 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400';
+};
+
+// ============================================================
+// --- ARCHIVOS RECIENTES (datos de ejemplo iniciales) ---
+// ============================================================
 const recentFiles = ref([
   {
     name: "Expediente_Cliente_A_2023.pdf",
     size: "14.2 MB",
     icon: FileText,
-    colorClass: "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400"
+    colorClass: "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400",
+    url: null, isNew: false
   },
   {
     name: "Contrato_Compraventa_Firma.docx",
     size: "2.1 MB",
     icon: FileText,
-    colorClass: "bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400"
+    colorClass: "bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400",
+    url: null, isNew: false
   },
   {
     name: "Identificacion_INE_Frontal.jpg",
     size: "4.8 MB",
     icon: ImageIcon,
-    colorClass: "bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400"
+    colorClass: "bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400",
+    url: null, isNew: false
   },
   {
     name: "Tabla_Amortizacion_Hipotecario.xlsx",
     size: "1.1 MB",
     icon: FileSpreadsheet,
-    colorClass: "bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500"
+    colorClass: "bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500",
+    url: null, isNew: false
   }
 ]);
 </script>
