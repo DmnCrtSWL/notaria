@@ -12,8 +12,12 @@
         <div class="flex gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar pb-2 sm:pb-0">
           <button @click="activeFilter = 'todos'" :class="activeFilter === 'todos' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Todos</button>
           <button @click="activeFilter = 'pdf'" :class="activeFilter === 'pdf' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">PDFs</button>
-          <button @click="activeFilter = 'doc'" :class="activeFilter === 'doc' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Word / Excel</button>
+          <button @click="activeFilter = 'doc'" :class="activeFilter === 'doc' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Word</button>
+          <button @click="activeFilter = 'xls'" :class="activeFilter === 'xls' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Excel</button>
+          <button @click="activeFilter = 'ppt'" :class="activeFilter === 'ppt' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Presentaciones</button>
           <button @click="activeFilter = 'img'" :class="activeFilter === 'img' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Imágenes</button>
+          <button @click="activeFilter = 'zip'" :class="activeFilter === 'zip' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Comprimidos</button>
+          <button @click="activeFilter = 'media'" :class="activeFilter === 'media' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Audio/Video</button>
         </div>
       </div>
 
@@ -108,7 +112,7 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
-import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, Download, CheckCircle, XCircle } from "lucide-vue-next";
+import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, Download, CheckCircle, XCircle, Presentation, Archive, Film } from "lucide-vue-next";
 import API_BASE_URL from '@/config/api';
 
 // ============================================================
@@ -135,9 +139,17 @@ const filteredFiles = computed(() => {
     if (activeFilter.value === 'pdf') {
       matchesCategory = ext === 'pdf';
     } else if (activeFilter.value === 'doc') {
-      matchesCategory = ['doc', 'docx', 'xls', 'xlsx', 'csv'].includes(ext);
+      matchesCategory = ['doc', 'docx'].includes(ext);
+    } else if (activeFilter.value === 'xls') {
+      matchesCategory = ['xls', 'xlsx', 'csv'].includes(ext);
+    } else if (activeFilter.value === 'ppt') {
+      matchesCategory = ['ppt', 'pptx'].includes(ext);
     } else if (activeFilter.value === 'img') {
       matchesCategory = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext);
+    } else if (activeFilter.value === 'media') {
+      matchesCategory = ['mp3', 'mp4', 'wav', 'avi', 'mov', 'mkv'].includes(ext);
+    } else if (activeFilter.value === 'zip') {
+      matchesCategory = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext);
     }
     
     return matchesSearch && matchesCategory;
@@ -247,6 +259,9 @@ const getFileIconByName = (name) => {
   const ext = getExtension(name);
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return ImageIcon;
   if (['xls', 'xlsx', 'csv'].includes(ext)) return FileSpreadsheet;
+  if (['ppt', 'pptx'].includes(ext)) return Presentation;
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return Archive;
+  if (['mp3', 'mp4', 'wav', 'avi', 'mov', 'mkv'].includes(ext)) return Film;
   return FileText;
 };
 
@@ -255,6 +270,9 @@ const getFileColorByName = (name) => {
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400';
   if (['xls', 'xlsx', 'csv'].includes(ext)) return 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500';
   if (ext === 'pdf') return 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400';
+  if (['ppt', 'pptx'].includes(ext)) return 'bg-orange-50 text-orange-500 dark:bg-orange-500/10 dark:text-orange-400';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'bg-purple-50 text-purple-500 dark:bg-purple-500/10 dark:text-purple-400';
+  if (['mp3', 'mp4', 'wav', 'avi', 'mov', 'mkv'].includes(ext)) return 'bg-pink-50 text-pink-500 dark:bg-pink-500/10 dark:text-pink-400';
   return 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400';
 };
 
