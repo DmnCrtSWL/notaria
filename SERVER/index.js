@@ -11,7 +11,14 @@ const N8N_CONFIRMAR_CITA_URL = 'https://dmncrt.app.n8n.cloud/webhook/notaria-con
 const N8N_RECHAZAR_CITA_URL  = 'https://dmncrt.app.n8n.cloud/webhook/notaria-rechazar-cita';
 
 app.use(cors({
-  origin: ['https://notaria-client.vercel.app', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: function (origin, callback) {
+    // Permite cualquier subdominio de vercel.app, localhost, o sin origin (Postman, etc.)
+    if (!origin || /\.vercel\.app$/.test(origin) || /^http:\/\/localhost/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS no permitido para: ' + origin));
+    }
+  },
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
   credentials: true
 }));
@@ -351,7 +358,12 @@ app.delete('/api/usuarios/:id', async (req, res) => {
 });
 
 // ============================================================
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://127.0.0.1:${PORT}`);
-  console.log(`Conectado a n8n en: ${N8N_WEBHOOK_URL}`);
-});
+// Exportar para Vercel (serverless) y también escuchar en local
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://127.0.0.1:${PORT}`);
+    console.log(`Conectado a n8n en: ${N8N_WEBHOOK_URL}`);
+  });
+}
+
+module.exports = app;
