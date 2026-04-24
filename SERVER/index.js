@@ -205,6 +205,24 @@ app.delete('/api/citas/:id', async (req, res) => {
   }
 });
 
+// Modificar cita del calendario
+app.put('/api/citas/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, start, nombre, celular } = req.body;
+  const [fecha, horario] = start.split('T');
+
+  try {
+    const result = await pool.query(
+      'UPDATE Citas SET tramite = $1, fecha = $2, horario = $3, client_nombre = $4, telefono = $5 WHERE id = $6 RETURNING *',
+      [title, fecha, horario || '00:00:00', nombre, celular, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al actualizar cita:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================
 // --- ENDPOINTS DE MENSAJERÍA (Chat / WhatsApp) ---
 // ============================================================

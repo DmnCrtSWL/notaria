@@ -34,8 +34,7 @@
                   <input
                     v-model="eventTitle"
                     type="text"
-                    :disabled="!!selectedEvent"
-                    class="disabled:bg-gray-50 dark:disabled:bg-gray-800 dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                   />
                 </div>
 
@@ -48,8 +47,7 @@
                     <input
                       v-model="eventNombre"
                       type="text"
-                      :disabled="!!selectedEvent"
-                      class="disabled:bg-gray-50 dark:disabled:bg-gray-800 dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     />
                   </div>
 
@@ -60,8 +58,7 @@
                     <input
                       v-model="eventCelular"
                       type="text"
-                      :disabled="!!selectedEvent"
-                      class="disabled:bg-gray-50 dark:disabled:bg-gray-800 dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     />
                   </div>
                 </div>
@@ -72,12 +69,7 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                       Fecha y Hora de Cita
                     </label>
-                    <div v-if="selectedEvent" class="h-11 w-full rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 px-4 py-2.5 text-sm text-gray-800 dark:text-white/90 flex items-center gap-2">
-                      <CalendarIcon class="w-4 h-4 text-gray-400" />
-                      {{ formatEventDate(selectedEvent.start) }}
-                    </div>
                     <input
-                      v-else
                       v-model="eventStartDate"
                       type="datetime-local"
                       class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
@@ -95,19 +87,18 @@
                 </button>
 
                 <button
-                  v-if="!selectedEvent"
-                  @click="handleAddOrUpdateEvent"
-                  class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto transition-colors"
-                >
-                  Agendar
-                </button>
-
-                <button
                   v-if="selectedEvent"
                   @click="handleDeleteEvent"
                   class="flex w-full justify-center rounded-lg border border-error-500 bg-error-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-error-600 sm:w-auto transition-colors"
                 >
                   Eliminar Cita
+                </button>
+
+                <button
+                  @click="handleAddOrUpdateEvent"
+                  class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto transition-colors"
+                >
+                  {{ selectedEvent ? 'Actualizar' : 'Agendar' }}
                 </button>
               </div>
             </div>
@@ -318,7 +309,14 @@ const handleEventClick = (clickInfo) => {
   eventTitle.value = event.title
   eventNombre.value = event.extendedProps.nombre || ''
   eventCelular.value = event.extendedProps.celular || ''
-  eventStartDate.value = event.start?.toISOString().split('T')[0] || ''
+  
+  if (event.start) {
+    const tzOffset = event.start.getTimezoneOffset() * 60000; // offset in milliseconds
+    const localISOTime = (new Date(event.start - tzOffset)).toISOString().slice(0, 16);
+    eventStartDate.value = localISOTime;
+  } else {
+    eventStartDate.value = ''
+  }
   openModal()
 }
 
@@ -326,17 +324,22 @@ const handleAddOrUpdateEvent = async () => {
   if (!eventTitle.value || !eventStartDate.value) return;
 
   const eventData = {
-    id: selectedEvent.value ? selectedEvent.value.id : null,
     title: eventTitle.value,
     nombre: eventNombre.value,
     celular: eventCelular.value,
     start: eventStartDate.value,
-    status: 'confirmed'
+    status: 'confirmado'
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/citas`, {
-      method: 'POST',
+    const isUpdate = selectedEvent.value && selectedEvent.value.id;
+    const url = isUpdate 
+      ? `${API_BASE_URL}/api/citas/${selectedEvent.value.id}` 
+      : `${API_BASE_URL}/api/citas`;
+    const method = isUpdate ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(eventData)
     });
@@ -347,7 +350,7 @@ const handleAddOrUpdateEvent = async () => {
       closeModal();
     }
   } catch (err) {
-    console.error('Error saving cita:', err);
+    console.error('Error saving/updating cita:', err);
   }
 }
 
