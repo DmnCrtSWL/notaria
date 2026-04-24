@@ -67,16 +67,23 @@
 
       <!-- Drag & Drop Zone -->
       <div
-        class="w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-colors cursor-pointer group"
+        class="w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all cursor-pointer group"
         :class="uploading
-          ? 'border-brand-400 bg-brand-50/50 dark:bg-brand-500/10 animate-pulse'
+          ? 'border-brand-400 bg-brand-50/50 dark:bg-brand-500/10'
           : 'border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 bg-gray-50/50 dark:bg-gray-800/20'"
         @click="triggerFileInput"
         @dragover.prevent
         @drop.prevent="handleDrop"
       >
-        <div class="w-16 h-16 bg-brand-100 dark:bg-brand-500/20 text-brand-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-          <UploadCloud class="w-8 h-8" />
+        <div
+          class="w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-transform"
+          :class="uploading ? 'bg-brand-500 text-white scale-110' : 'bg-brand-100 dark:bg-brand-500/20 text-brand-500 group-hover:scale-110'"
+        >
+          <UploadCloud v-if="!uploading" class="w-8 h-8" />
+          <svg v-else class="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
         </div>
         <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">
           {{ uploading ? 'Subiendo archivo...' : 'Arrastra tus archivos aquí' }}
@@ -84,7 +91,26 @@
         <p class="text-sm text-gray-500 text-center max-w-sm">
           {{ uploading ? uploadStatus : 'Soporta PDF, DOCX, XLSX, imágenes y más. Haz clic o arrastra para subir.' }}
         </p>
+        <!-- Barra de progreso -->
+        <div v-if="uploading" class="w-full max-w-xs mt-5 bg-brand-100 dark:bg-brand-500/20 rounded-full h-1.5 overflow-hidden">
+          <div class="h-1.5 bg-brand-500 rounded-full animate-progress"></div>
+        </div>
       </div>
+
+      <!-- Toast de notificación -->
+      <Transition name="toast">
+        <div
+          v-if="toast.show"
+          class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-medium"
+          :class="toast.type === 'success'
+            ? 'bg-green-500 text-white'
+            : 'bg-red-500 text-white'"
+        >
+          <CheckCircle v-if="toast.type === 'success'" class="w-5 h-5 shrink-0" />
+          <XCircle v-else class="w-5 h-5 shrink-0" />
+          {{ toast.message }}
+        </div>
+      </Transition>
 
       <!-- Recientes -->
       <div>
@@ -127,7 +153,7 @@
 <script setup>
 import { ref } from "vue";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
-import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, MoreVertical, Download } from "lucide-vue-next";
+import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, Download, CheckCircle, XCircle } from "lucide-vue-next";
 import API_BASE_URL from '@/config/api';
 
 // ============================================================
@@ -136,6 +162,12 @@ import API_BASE_URL from '@/config/api';
 const fileInputRef = ref(null);
 const uploading = ref(false);
 const uploadStatus = ref('');
+const toast = ref({ show: false, type: 'success', message: '' });
+
+const showToast = (type, message) => {
+  toast.value = { show: true, type, message };
+  setTimeout(() => { toast.value.show = false; }, 4000);
+};
 
 const triggerFileInput = () => {
   if (!uploading.value) fileInputRef.value?.click();
@@ -190,11 +222,13 @@ const uploadFile = async (file) => {
       isNew: true,
     });
 
-    uploadStatus.value = '¡Archivo subido exitosamente!';
+    uploadStatus.value = '¡Subida completa!';
+    showToast('success', `"${file.name}" subido exitosamente.`);
     console.log('Ruta en S3:', key);
   } catch (error) {
     console.error('Error al subir:', error);
     uploadStatus.value = `Error: ${error.message}`;
+    showToast('error', `Error al subir: ${error.message}`);
   } finally {
     uploading.value = false;
     setTimeout(() => { uploadStatus.value = ''; }, 3000);
@@ -260,5 +294,24 @@ const recentFiles = ref([
 .loader-stripes {
   background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
   background-size: 1rem 1rem;
+}
+
+/* Barra de progreso indeterminada */
+.animate-progress {
+  width: 40%;
+  animation: progress-slide 1.4s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Toast slide-up */
+.toast-enter-active, .toast-leave-active {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toast-enter-from, .toast-leave-to {
+  opacity: 0;
+  transform: translateY(1rem) scale(0.95);
 }
 </style>
