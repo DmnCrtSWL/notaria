@@ -3,6 +3,17 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 require('dotenv').config();
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+// --- CONFIGURACIÓN DE AWS S3 ---
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,6 +34,34 @@ app.use(cors({
   credentials: true
 }));
 app.use(bodyParser.json());
+
+// ============================================================
+// --- ENDPOINT DE SUBIDA A S3 ---
+// ============================================================
+
+// Genera una URL prefirmada para subir un archivo directamente a S3
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { fileName, fileType } = req.body;
+    if (!fileName || !fileType) {
+      return res.status(400).json({ error: 'fileName y fileType son requeridos' });
+    }
+
+    const command = new PutObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `documentos/${Date.now()}-${fileName}`, // Con fecha para evitar duplicados
+      ContentType: fileType,
+    });
+
+    // URL que expira en 60 segundos
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 });
+
+    res.status(200).json({ uploadUrl, key: command.input.Key });
+  } catch (error) {
+    console.error('Error generando URL de S3:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // --- CONFIGURACIÓN DE POSTGRESQL ---
 const { Pool } = require('pg');
