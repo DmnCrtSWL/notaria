@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 require('dotenv').config();
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // --- CONFIGURACIÓN DE AWS S3 ---
@@ -59,6 +59,38 @@ app.post('/api/upload', async (req, res) => {
     res.status(200).json({ uploadUrl, key: command.input.Key });
   } catch (error) {
     console.error('Error generando URL de S3:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar archivos del bucket S3
+app.get('/api/files', async (req, res) => {
+  try {
+    const command = new ListObjectsV2Command({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Prefix: 'documentos/',
+    });
+
+    const data = await s3Client.send(command);
+    const files = (data.Contents || [])
+      .filter(item => item.Key !== 'documentos/') // Excluir la carpeta misma
+      .map(item => {
+        const fullName = item.Key.replace('documentos/', '');
+        // Quitar el prefijo de timestamp (e.g. "1713975432123-")
+        const name = fullName.replace(/^\d+-/, '');
+        return {
+          key: item.Key,
+          name,
+          size: item.Size,
+          lastModified: item.LastModified,
+          url: `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${item.Key}`,
+        };
+      })
+      .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+
+    res.json(files);
+  } catch (error) {
+    console.error('Error listando archivos de S3:', error);
     res.status(500).json({ error: error.message });
   }
 });

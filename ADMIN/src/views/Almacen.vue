@@ -151,7 +151,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
 import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, Download, CheckCircle, XCircle } from "lucide-vue-next";
 import API_BASE_URL from '@/config/api';
@@ -163,6 +163,8 @@ const fileInputRef = ref(null);
 const uploading = ref(false);
 const uploadStatus = ref('');
 const toast = ref({ show: false, type: 'success', message: '' });
+const recentFiles = ref([]);
+const loadingFiles = ref(true);
 
 const showToast = (type, message) => {
   toast.value = { show: true, type, message };
@@ -181,7 +183,6 @@ const handleDrop = (event) => {
 const uploadToS3 = (event) => {
   const file = event.target.files[0];
   if (file) uploadFile(file);
-  // Resetear el input para permitir subir el mismo archivo de nuevo
   event.target.value = '';
 };
 
@@ -190,7 +191,6 @@ const uploadFile = async (file) => {
   uploadStatus.value = `Preparando ${file.name}...`;
 
   try {
-    // PASO 1: Obtener la URL pre-firmada de nuestra API
     uploadStatus.value = 'Obteniendo permiso de subida...';
     const response = await fetch(`${API_BASE_URL}/api/upload`, {
       method: 'POST',
@@ -201,7 +201,6 @@ const uploadFile = async (file) => {
     if (!response.ok) throw new Error('Error al obtener URL de subida');
     const { uploadUrl, key } = await response.json();
 
-    // PASO 2: Subir el archivo directamente a AWS S3
     uploadStatus.value = `Subiendo ${file.name}...`;
     const result = await fetch(uploadUrl, {
       method: 'PUT',
@@ -211,16 +210,8 @@ const uploadFile = async (file) => {
 
     if (!result.ok) throw new Error('Error al subir a S3');
 
-    // Agregar al listado de recientes
-    const s3PublicUrl = uploadUrl.split('?')[0]; // URL pública sin parámetros
-    recentFiles.value.unshift({
-      name: file.name,
-      size: formatFileSize(file.size),
-      icon: getFileIcon(file.type),
-      colorClass: getFileColorClass(file.type),
-      url: s3PublicUrl,
-      isNew: true,
-    });
+    // Recargar la lista completa desde S3
+    await fetchFiles();
 
     uploadStatus.value = '¡Subida completa!';
     showToast('success', `"${file.name}" subido exitosamente.`);
@@ -235,13 +226,61 @@ const uploadFile = async (file) => {
   }
 };
 
-// Helpers
+// ============================================================
+// --- CARGAR ARCHIVOS DESDE S3 ---
+// ============================================================
+const fetchFiles = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/files`);
+    if (!response.ok) throw new Error('Error al cargar archivos');
+    const files = await response.json();
+
+    recentFiles.value = files.map(f => ({
+      name: f.name,
+      size: formatFileSize(f.size),
+      icon: getFileIconByName(f.name),
+      colorClass: getFileColorByName(f.name),
+      url: f.url,
+      isNew: false,
+    }));
+  } catch (error) {
+    console.error('Error cargando archivos:', error);
+  } finally {
+    loadingFiles.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchFiles();
+});
+
+// ============================================================
+// --- HELPERS ---
+// ============================================================
 const formatFileSize = (bytes) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const getExtension = (name) => (name.split('.').pop() || '').toLowerCase();
+
+const getFileIconByName = (name) => {
+  const ext = getExtension(name);
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return ImageIcon;
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return FileSpreadsheet;
+  return FileText;
+};
+
+const getFileColorByName = (name) => {
+  const ext = getExtension(name);
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400';
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500';
+  if (ext === 'pdf') return 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400';
+  return 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400';
+};
+
+// Mantener compatibilidad con uploads (usan MIME type)
 const getFileIcon = (mimeType) => {
   if (mimeType.startsWith('image/')) return ImageIcon;
   if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return FileSpreadsheet;
@@ -254,40 +293,6 @@ const getFileColorClass = (mimeType) => {
   if (mimeType.includes('pdf')) return 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400';
   return 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400';
 };
-
-// ============================================================
-// --- ARCHIVOS RECIENTES (datos de ejemplo iniciales) ---
-// ============================================================
-const recentFiles = ref([
-  {
-    name: "Expediente_Cliente_A_2023.pdf",
-    size: "14.2 MB",
-    icon: FileText,
-    colorClass: "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400",
-    url: null, isNew: false
-  },
-  {
-    name: "Contrato_Compraventa_Firma.docx",
-    size: "2.1 MB",
-    icon: FileText,
-    colorClass: "bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400",
-    url: null, isNew: false
-  },
-  {
-    name: "Identificacion_INE_Frontal.jpg",
-    size: "4.8 MB",
-    icon: ImageIcon,
-    colorClass: "bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400",
-    url: null, isNew: false
-  },
-  {
-    name: "Tabla_Amortizacion_Hipotecario.xlsx",
-    size: "1.1 MB",
-    icon: FileSpreadsheet,
-    colorClass: "bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-500",
-    url: null, isNew: false
-  }
-]);
 </script>
 
 <style scoped>
