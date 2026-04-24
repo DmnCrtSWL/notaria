@@ -2,63 +2,18 @@
   <AdminLayout>
     <div class="space-y-6">
       
-      <!-- Encabezado y Estadísticas -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="md:col-span-2 bg-gradient-to-br from-brand-600 to-brand-800 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
-          <div class="relative z-10">
-            <h2 class="text-3xl font-bold mb-2">Archivero Digital</h2>
-            <p class="text-brand-100 max-w-lg text-sm sm:text-base mb-6">
-              Sube, organiza y administra de forma segura tus documentos, expedientes y archivos pesados. Accede a ellos desde cualquier lugar sin saturar tu dispositivo móvil.
-            </p>
-            <button @click="triggerFileInput" class="bg-white text-brand-700 px-6 py-2.5 rounded-full font-semibold hover:bg-brand-50 transition-all shadow-md flex items-center gap-2">
-              <UploadCloud class="w-5 h-5" /> Subir Archivos
-            </button>
-          </div>
-          <!-- Decoración Fondo -->
-          <div class="absolute -right-10 -bottom-10 opacity-20">
-            <HardDrive class="w-64 h-64" stroke-width="0.5" />
-          </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-theme-xs border border-gray-100 dark:border-gray-700 flex flex-col justify-center">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold text-gray-800 dark:text-white/90 text-lg">Almacenamiento</h3>
-            <span class="p-2 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-lg"><HardDrive class="w-5 h-5" /></span>
-          </div>
-          <div class="mb-2 flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">Espacio Usado</span>
-            <span class="font-medium text-gray-800 dark:text-white/90">45 GB / 100 GB</span>
-          </div>
-          <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 mb-6 overflow-hidden">
-            <div class="bg-brand-500 h-3 rounded-full relative" style="width: 45%;">
-               <div class="absolute top-0 right-0 bottom-0 left-0 bg-white/20 overflow-hidden loader-stripes"></div>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4 text-center">
-            <div class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
-              <p class="text-xs text-gray-500 mb-1">Documentos</p>
-              <p class="font-bold text-gray-800 dark:text-white/90">1.2k</p>
-            </div>
-            <div class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
-              <p class="text-xs text-gray-500 mb-1">Imágenes</p>
-              <p class="font-bold text-gray-800 dark:text-white/90">340</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Buscador y Categorías -->
       <div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
         <div class="relative w-full sm:w-96">
           <Search class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input type="text" placeholder="Buscar por nombre, cliente, o folio..." class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full py-2.5 pl-11 pr-4 text-sm text-gray-800 dark:text-white/90 focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-theme-xs transition-shadow" />
+          <input v-model="searchQuery" type="text" placeholder="Buscar por nombre, cliente, o folio..." class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full py-2.5 pl-11 pr-4 text-sm text-gray-800 dark:text-white/90 focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-theme-xs transition-shadow" />
         </div>
         
         <div class="flex gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar pb-2 sm:pb-0">
-          <button class="px-4 py-2 bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 rounded-full text-sm font-medium whitespace-nowrap">Todos</button>
-          <button class="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 rounded-full text-sm font-medium whitespace-nowrap transition-colors">PDFs</button>
-          <button class="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Word / Excel</button>
-          <button class="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Imágenes</button>
+          <button @click="activeFilter = 'todos'" :class="activeFilter === 'todos' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Todos</button>
+          <button @click="activeFilter = 'pdf'" :class="activeFilter === 'pdf' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">PDFs</button>
+          <button @click="activeFilter = 'doc'" :class="activeFilter === 'doc' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Word / Excel</button>
+          <button @click="activeFilter = 'img'" :class="activeFilter === 'img' ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400'" class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors">Imágenes</button>
         </div>
       </div>
 
@@ -116,7 +71,7 @@
       <div>
         <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Agregados Recientemente</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div v-for="(file, i) in recentFiles" :key="i" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-theme-xs hover:shadow-theme-md transition-shadow group relative flex flex-col">
+          <div v-for="(file, i) in filteredFiles" :key="i" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-theme-xs hover:shadow-theme-md transition-shadow group relative flex flex-col">
             <div class="flex justify-between items-start mb-4">
               <div :class="['p-3 rounded-lg', file.colorClass]">
                 <component :is="file.icon" class="w-6 h-6" />
@@ -151,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import AdminLayout from "@/components/layout/AdminLayout.vue";
 import { UploadCloud, HardDrive, Search, FileText, Image as ImageIcon, FileSpreadsheet, Download, CheckCircle, XCircle } from "lucide-vue-next";
 import API_BASE_URL from '@/config/api';
@@ -165,6 +120,29 @@ const uploadStatus = ref('');
 const toast = ref({ show: false, type: 'success', message: '' });
 const recentFiles = ref([]);
 const loadingFiles = ref(true);
+const searchQuery = ref('');
+const activeFilter = ref('todos');
+
+const filteredFiles = computed(() => {
+  return recentFiles.value.filter(file => {
+    // Search filter
+    const matchesSearch = file.name.toLowerCase().includes(searchQuery.value.toLowerCase());
+    
+    // Category filter
+    let matchesCategory = true;
+    const ext = getExtension(file.name);
+    
+    if (activeFilter.value === 'pdf') {
+      matchesCategory = ext === 'pdf';
+    } else if (activeFilter.value === 'doc') {
+      matchesCategory = ['doc', 'docx', 'xls', 'xlsx', 'csv'].includes(ext);
+    } else if (activeFilter.value === 'img') {
+      matchesCategory = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext);
+    }
+    
+    return matchesSearch && matchesCategory;
+  });
+});
 
 const showToast = (type, message) => {
   toast.value = { show: true, type, message };
