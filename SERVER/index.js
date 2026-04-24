@@ -68,19 +68,19 @@ app.get('/api/files', async (req, res) => {
   try {
     const command = new ListObjectsV2Command({
       Bucket: process.env.AWS_BUCKET_NAME,
-      Prefix: 'documentos/',
     });
 
     const data = await s3Client.send(command);
     const files = (data.Contents || [])
-      .filter(item => item.Key !== 'documentos/') // Excluir la carpeta misma
+      .filter(item => item.Size > 0) // Excluir carpetas vacías
       .map(item => {
-        const fullName = item.Key.replace('documentos/', '');
-        // Quitar el prefijo de timestamp (e.g. "1713975432123-")
-        const name = fullName.replace(/^\d+-/, '');
+        // Obtener solo el nombre del archivo (quitar carpetas y timestamp)
+        const parts = item.Key.split('/');
+        const rawName = parts[parts.length - 1];
+        const name = rawName.replace(/^\d+-/, '');
         return {
           key: item.Key,
-          name,
+          name: name || rawName,
           size: item.Size,
           lastModified: item.LastModified,
           url: `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${item.Key}`,
