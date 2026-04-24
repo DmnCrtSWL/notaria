@@ -152,9 +152,6 @@
               <button @click="handleRejectSolicitud(solicitud.id)" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 text-xs font-semibold transition-colors">
                 <X class="w-3.5 h-3.5" /> Rechazar
               </button>
-              <button @click="handleReagendar(solicitud)" class="w-full flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 text-xs font-semibold transition-colors mt-1">
-                <Clock class="w-3.5 h-3.5" /> Reagendar
-              </button>
             </div>
           </div>
 
@@ -173,7 +170,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import Modal from '@/components/ui/Modal.vue'
-import { Bell, Check, X, Clock, Calendar as CalendarIcon, Phone } from 'lucide-vue-next'
+import { Bell, Check, X, Calendar as CalendarIcon, Phone } from 'lucide-vue-next'
 import API_BASE_URL from '@/config/api'
 
 const currentPageTitle = ref('Citas')
@@ -267,15 +264,7 @@ const handleRejectSolicitud = async (id) => {
   }
 }
 
-const handleReagendar = (solicitud) => {
-  resetModalFields()
-  selectedEvent.value = { id: solicitud.id }
-  eventTitle.value = solicitud.title
-  eventNombre.value = solicitud.nombre || ''
-  eventCelular.value = solicitud.celular || ''
-  eventStartDate.value = solicitud.start_date?.split(' ')[0] || ''
-  openModal()
-}
+
 
 const openModal = () => {
   isOpen.value = true
