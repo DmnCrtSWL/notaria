@@ -9,8 +9,11 @@ import {
   Smile, 
   Mic, 
   Send,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft
 } from 'lucide-vue-next';
+
+const showChat = ref(false);
 
 const messages = ref([]);
 const newMessage = ref('');
@@ -133,7 +136,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="whatsapp-app">
+  <div :class="['whatsapp-app', { 'show-chat': showChat }]">
     <!-- Sidebar -->
     <div class="sidebar">
       <header class="sidebar-header">
@@ -152,7 +155,7 @@ onMounted(() => {
       </div>
       
       <div class="chat-list">
-        <div class="chat-item active">
+        <div class="chat-item active" @click="showChat = true">
           <div class="avatar profile-pic"></div>
           <div class="chat-info">
             <div class="chat-name">Notaría Pruebas</div>
@@ -166,7 +169,7 @@ onMounted(() => {
         </div>
         
         <!-- Placeholder chats -->
-        <div class="chat-item" v-for="i in 5" :key="i">
+        <div class="chat-item" v-for="i in 5" :key="i" @click="showChat = true">
           <div class="avatar" :style="{ background: `hsl(${i * 60}, 70%, 40%)` }">{{ String.fromCharCode(65 + i) }}</div>
           <div class="chat-info">
             <div class="chat-name">Contacto {{ i }}</div>
@@ -179,6 +182,7 @@ onMounted(() => {
     <!-- Main Chat Window -->
     <div class="main-chat">
       <header class="chat-header">
+        <ChevronLeft class="icon back-button" @click="showChat = false" />
         <div class="avatar profile-pic"></div>
         <div class="contact-info">
           <div class="name">Notaría Pruebas</div>
