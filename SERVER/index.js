@@ -240,10 +240,10 @@ app.get('/api/solicitudes', async (req, res) => {
   }
 });
 
-// Confirmar o Rechazar solicitud (con integración n8n)
+// Confirmar, Rechazar o Reagendar solicitud (con integración n8n)
 app.put('/api/solicitudes/:id', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body; // 'confirmed' o 'rejected'
+  const { status, fecha, horario } = req.body;
 
   try {
     if (status === 'rejected') {
@@ -251,10 +251,65 @@ app.put('/api/solicitudes/:id', async (req, res) => {
         'UPDATE Citas SET estado = $1 WHERE id = $2 RETURNING *',
         ['rechazado', id]
       );
-      return res.json({ message: 'Solicitud rechazada', cita: rejectResult.rows[0] });
+      const cita = rejectResult.rows[0];
+      // Notificar a n8n usando el mismo flujo central
+      try {
+        await fetch(N8N_CONFIRMAR_CITA_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cita.id,
+            nombre: cita.client_nombre,
+            telefono: cita.telefono,
+            tramite: cita.tramite,
+            fecha: cita.fecha,
+            horario: cita.horario,
+            estado: 'rechazado',
+            webhook_destino: 'https://notaria-server.vercel.app/api/webhook'
+          })
+        });
+        console.log(`❌ Cita ID ${id} rechazada y notificada a n8n`);
+      } catch (n8nErr) {
+        console.error('⚠️ Error al llamar n8n (rechazo):', n8nErr.message);
+      }
+      return res.json({ message: 'Solicitud rechazada', cita });
     }
 
-    // 1. Actualizar estado en la base de datos
+    if (status === 'rescheduled') {
+      if (!fecha || !horario) {
+        return res.status(400).json({ error: 'fecha y horario son requeridos para reagendar' });
+      }
+      const result = await pool.query(
+        'UPDATE Citas SET estado = $1, fecha = $2, horario = $3 WHERE id = $4 RETURNING *',
+        ['reagendado', fecha, horario, id]
+      );
+      const cita = result.rows[0];
+
+      // Notificar reagendado a n8n
+      try {
+        await fetch(N8N_CONFIRMAR_CITA_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: cita.id,
+            nombre: cita.client_nombre,
+            telefono: cita.telefono,
+            tramite: cita.tramite,
+            fecha: cita.fecha,
+            horario: cita.horario,
+            estado: 'reagendado',
+            webhook_destino: 'https://notaria-server.vercel.app/api/webhook'
+          })
+        });
+        console.log(`🔄 Cita ID ${id} reagendada y notificada a n8n`);
+      } catch (n8nErr) {
+        console.error('⚠️ Error al llamar n8n (reagendado):', n8nErr.message);
+      }
+
+      return res.json({ message: 'Cita reagendada', cita });
+    }
+
+    // Confirmar
     const result = await pool.query(
       'UPDATE Citas SET estado = $1 WHERE id = $2 RETURNING *',
       ['confirmado', id]
@@ -281,13 +336,12 @@ app.put('/api/solicitudes/:id', async (req, res) => {
       });
       console.log(`✅ Flujo n8n disparado para cita ID ${id} (${cita.client_nombre})`);
     } catch (n8nErr) {
-      // La cita ya quedó confirmada en DB aunque n8n falle
       console.error('⚠️ Error al llamar n8n:', n8nErr.message);
     }
 
     res.json(cita);
   } catch (err) {
-    console.error('Error al confirmar solicitud:', err);
+    console.error('Error al actualizar solicitud:', err);
     res.status(500).json({ error: err.message });
   }
 });

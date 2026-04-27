@@ -19,15 +19,19 @@
         !isExpanded && !isHovered ? 'lg:justify-center' : 'justify-start',
       ]"
     >
-      <router-link to="/" class="flex h-10 items-center">
-        <h1
+      <router-link to="/" class="flex items-center">
+        <img 
           v-if="isExpanded || isHovered || isMobileOpen"
-          class="text-3xl font-bold text-gray-900 dark:text-white"
-        >Notaría</h1>
-        <h1
+          src="/logo_notaria.jpeg"
+          alt="Notaría Logo"
+          class="h-20 w-auto"
+        />
+        <img 
           v-else
-          class="text-2xl font-bold text-gray-900 dark:text-white text-center w-full"
-        >N</h1>
+          src="/logo_notaria.jpeg"
+          alt="N"
+          class="h-10 w-10 object-cover rounded-full mx-auto"
+        />
       </router-link>
     </div>
     <div

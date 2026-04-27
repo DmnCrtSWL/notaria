@@ -74,8 +74,7 @@ const categoriasServicios = ref([
     <nav class="navbar">
       <div class="nav-container">
         <div class="logo">
-          <Scale class="logo-icon" />
-          <span>Notaría Pública</span>
+          <img src="/logo_notaria.jpeg" alt="Logo Notaría" class="logo-image" />
         </div>
         <div class="nav-links">
           <a href="#servicios">Servicios</a>
@@ -165,8 +164,7 @@ const categoriasServicios = ref([
       <div class="footer-grid">
         <div class="footer-about">
           <div class="logo">
-            <Scale class="logo-icon" />
-            <span>Notaría Pública</span>
+            <img src="/logo_notaria.jpeg" alt="Logo Notaría" class="logo-image" />
           </div>
           <p>Comprometidos con la legalidad, la transparencia y el servicio al cliente.</p>
         </div>
@@ -190,7 +188,7 @@ const categoriasServicios = ref([
 .landing-page {
   font-family: 'Inter', sans-serif;
   color: #cbd5e1;
-  background-color: #0f172a; /* Dark background */
+  background-color: #2E334A; /* Dark background */
   overflow-x: hidden;
 }
 
@@ -212,10 +210,9 @@ p {
   left: 0;
   width: 100%;
   padding: 1rem 0;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #ffffff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   z-index: 1000;
   transition: all 0.3s ease;
 }
@@ -235,13 +232,19 @@ p {
   gap: 0.75rem;
   font-weight: 700;
   font-size: 1.25rem;
-  color: #1a202c;
+  color: #2E334A;
 }
 
 .logo-icon {
   width: 28px;
   height: 28px;
-  color: #b58c5c; /* Aged Bronze/Gold */
+  color: #F4B116; /* Aged Bronze/Gold */
+}
+
+.logo-image {
+  height: 65px;
+  width: auto;
+  object-fit: contain;
 }
 
 .nav-links {
@@ -259,7 +262,7 @@ p {
 }
 
 .nav-links a:hover {
-  color: #b58c5c;
+  color: #F4B116;
 }
 
 /* --- Hero Section --- */
@@ -281,7 +284,7 @@ p {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to right, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.6) 100%);
+  background: linear-gradient(to right, rgba(46, 51, 74, 0.95) 0%, rgba(46, 51, 74, 0.6) 100%);
 }
 
 .hero-container {
@@ -325,7 +328,7 @@ p {
 }
 
 .hero-title span {
-  color: #b58c5c;
+  color: #F4B116;
   font-style: italic;
 }
 
@@ -401,7 +404,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: #b58c5c;
+  background-color: #F4B116;
   color: #ffffff;
   border: none;
   padding: 1rem 2.5rem;
@@ -446,7 +449,7 @@ p {
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 1rem;
-  color: #0f172a; /* Dark elegant blue */
+  color: #2E334A; /* Dark elegant blue */
 }
 
 .section-header p {
@@ -486,14 +489,14 @@ p {
 .category-main-icon {
   width: 42px;
   height: 42px;
-  color: #b58c5c;
+  color: #F4B116;
   margin-bottom: 1rem;
 }
 
 .category-header h3 {
   font-size: 1.35rem;
   font-weight: 600;
-  color: #1e293b;
+  color: #2E334A;
 }
 
 .category-list {
@@ -512,7 +515,7 @@ p {
 
 .category-list li::before {
   content: "✓";
-  color: #b58c5c;
+  color: #F4B116;
   font-weight: bold;
   position: absolute;
   left: 0;
@@ -530,7 +533,7 @@ p {
 /* --- Nosotros --- */
 .about {
   padding: 6rem 2rem;
-  background-color: #0f172a; 
+  background-color: #2E334A; 
   width: 100%;
 }
 
@@ -575,7 +578,7 @@ p {
 
 /* --- Footer --- */
 .footer {
-  background-color: #1a202c;
+  background-color: #1D202F;
   color: #a0aec0;
   padding: 5rem 2rem 2rem;
 }
@@ -620,7 +623,7 @@ p {
 .contact-icon {
   width: 18px;
   height: 18px;
-  color: #b58c5c;
+  color: #F4B116;
   flex-shrink: 0;
 }
 
@@ -641,7 +644,7 @@ p {
 }
 
 .footer-links a:hover {
-  color: #b58c5c;
+  color: #F4B116;
 }
 
 .footer-bottom {
