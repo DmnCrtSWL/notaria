@@ -81,7 +81,7 @@ body {
 }
 
 .avatar.profile-pic {
-  background-image: url('/thumb.jpg') !important;
+  background-image: url('/thumb.jpeg') !important;
   background-size: cover;
   background-position: center;
 }
