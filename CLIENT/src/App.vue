@@ -119,6 +119,12 @@ const formatTime = (timestamp) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+const formatMessage = (text) => {
+  if (!text) return '';
+  // Reemplaza " - " con un salto de línea seguido de "- " para que se muestre como lista
+  return text.replace(/ - /g, '\n- ');
+};
+
 onMounted(() => {
   fetchMessages();
   // Poll for new messages every 3 seconds (simple for tests)
@@ -191,7 +197,7 @@ onMounted(() => {
           :key="msg.id" 
           :class="['message-bubble', msg.incoming ? 'incoming' : 'outgoing']"
         >
-          <div class="message-text">{{ msg.text }}</div>
+          <div class="message-text">{{ formatMessage(msg.text) }}</div>
           <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
         </div>
       </div>
