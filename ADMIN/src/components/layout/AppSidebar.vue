@@ -221,7 +221,15 @@ const route = useRoute();
 
 const { isExpanded, isMobileOpen, isHovered, openSubmenu } = useSidebar();
 
-const menuGroups = [
+// Obtener rol del usuario desde localStorage
+const currentUser = JSON.parse(localStorage.getItem('notaria_user') || '{}')
+const userRole = currentUser.rol || ''
+const isOperativo = userRole === 'Operativo'
+
+// Rutas restringidas para el rol Operativo
+const restrictedPaths = ['/usuarios', '/almacen', '/archivos']
+
+const allMenuGroups = [
   {
     title: "Menu",
     items: [
@@ -236,13 +244,33 @@ const menuGroups = [
         path: "/almacen",
       },
       {
+        icon: DocsIcon,
+        name: "Archivos",
+        path: "/archivos",
+      },
+      {
         icon: Calendar,
         name: "Citas",
         path: "/citas",
       },
+      {
+        icon: ChatIcon,
+        name: "Solicitudes",
+        path: "/solicitudes",
+      },
     ],
   },
 ];
+
+// Filtrar items del menú según el rol del usuario
+const menuGroups = computed(() => {
+  return allMenuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item =>
+      isOperativo ? !restrictedPaths.includes(item.path) : true
+    )
+  }))
+})
 
 const isActive = (path) => route.path === path;
 
@@ -252,7 +280,7 @@ const toggleSubmenu = (groupIndex, itemIndex) => {
 };
 
 const isAnySubmenuRouteActive = computed(() => {
-  return menuGroups.some((group) =>
+  return menuGroups.value.some((group) =>
     group.items.some(
       (item) =>
         item.subItems && item.subItems.some((subItem) => isActive(subItem.path))
@@ -265,7 +293,7 @@ const isSubmenuOpen = (groupIndex, itemIndex) => {
   return (
     openSubmenu.value === key ||
     (isAnySubmenuRouteActive.value &&
-      menuGroups[groupIndex].items[itemIndex].subItems?.some((subItem) =>
+      menuGroups.value[groupIndex].items[itemIndex].subItems?.some((subItem) =>
         isActive(subItem.path)
       ))
   );

@@ -98,7 +98,7 @@
         @click="handleViewAllClick"
         class="mt-3 flex justify-center w-full rounded-lg border border-gray-300 bg-white p-3 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200"
       >
-        Ver Solicitudes en Citas
+        Ver todas las Solicitudes
       </button>
     </div>
     <!-- Dropdown End -->
@@ -164,13 +164,13 @@ const handleClickOutside = (event) => {
 const handleItemClick = (event) => {
   event.preventDefault()
   closeDropdown()
-  router.push('/citas')
+  router.push('/solicitudes')
 }
 
 const handleViewAllClick = (event) => {
   event.preventDefault()
   closeDropdown()
-  router.push('/citas')
+  router.push('/solicitudes')
 }
 
 onMounted(() => {

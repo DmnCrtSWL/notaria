@@ -32,6 +32,7 @@ const router = createRouter({
       component: () => import('../views/Usuarios.vue'),
       meta: {
         title: 'Usuarios',
+        requiresAdmin: true,
       },
     },
     {
@@ -40,6 +41,16 @@ const router = createRouter({
       component: () => import('../views/Almacen.vue'),
       meta: {
         title: 'Almacen',
+        requiresAdmin: true,
+      },
+    },
+    {
+      path: '/archivos',
+      name: 'Archivos',
+      component: () => import('../views/Archivos.vue'),
+      meta: {
+        title: 'Archivos',
+        requiresAdmin: true,
       },
     },
     {
@@ -48,6 +59,14 @@ const router = createRouter({
       component: () => import('../views/Citas.vue'),
       meta: {
         title: 'Citas',
+      },
+    },
+    {
+      path: '/solicitudes',
+      name: 'Solicitudes',
+      component: () => import('../views/Solicitudes.vue'),
+      meta: {
+        title: 'Solicitudes',
       },
     },
     {
@@ -166,20 +185,30 @@ const router = createRouter({
 // Rutas que NO requieren autenticación
 const publicRoutes = ['Signin', 'Signup', '404 Error']
 
+// Rol que NO puede ver rutas restringidas
+const RESTRICTED_ROLE = 'Operativo'
+
 router.beforeEach((to, from, next) => {
   document.title = `Notaria-Admin | ${to.meta.title || to.name}`
 
   const isPublic = publicRoutes.includes(to.name as string)
-  const isLoggedIn = !!localStorage.getItem('notaria_user')
+  const rawUser = localStorage.getItem('notaria_user')
+  const isLoggedIn = !!rawUser
 
   if (!isPublic && !isLoggedIn) {
-    // Guardar ruta destino para redirigir después del login
     return next({ name: 'Signin' })
   }
 
   if (to.name === 'Signin' && isLoggedIn) {
-    // Si ya está autenticado y va al login, mandarlo al inicio
-    return next({ path: '/almacen' })
+    return next({ path: '/citas' })
+  }
+
+  // Bloquear rutas restringidas para el rol Operativo
+  if (to.meta.requiresAdmin && isLoggedIn) {
+    const user = JSON.parse(rawUser!)
+    if (user.rol === RESTRICTED_ROLE) {
+      return next({ path: '/citas' })
+    }
   }
 
   next()

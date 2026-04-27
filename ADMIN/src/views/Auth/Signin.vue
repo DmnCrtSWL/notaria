@@ -120,7 +120,13 @@ const handleSubmit = async () => {
 
     // Guardar sesión en localStorage
     localStorage.setItem('notaria_user', JSON.stringify(data.user))
-    router.push('/almacen')
+    // Redirigir según el rol: Operativo solo puede ver Citas/Solicitudes
+    const rol = data.user.rol
+    if (rol === 'Operativo') {
+      router.push('/citas')
+    } else {
+      router.push('/almacen')
+    }
   } catch (err) {
     errorMsg.value = 'No se pudo conectar al servidor.'
   } finally {

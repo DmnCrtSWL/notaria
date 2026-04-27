@@ -95,6 +95,51 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
+// Obtener estadísticas de almacenamiento de S3 (espacio usado real)
+app.get('/api/storage', async (req, res) => {
+  try {
+    const LIMIT_GB = 50;
+    const LIMIT_BYTES = LIMIT_GB * 1024 * 1024 * 1024;
+
+    let totalBytes = 0;
+    let isTruncated = true;
+    let continuationToken = undefined;
+
+    // Paginar por si hay más de 1000 archivos
+    while (isTruncated) {
+      const command = new ListObjectsV2Command({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        ContinuationToken: continuationToken,
+      });
+
+      const data = await s3Client.send(command);
+      const contents = data.Contents || [];
+
+      // Sumar tamaño de todos los objetos (excluir carpetas)
+      contents.filter(item => item.Size > 0).forEach(item => {
+        totalBytes += item.Size;
+      });
+
+      isTruncated = data.IsTruncated;
+      continuationToken = data.NextContinuationToken;
+    }
+
+    const usedGB = totalBytes / (1024 * 1024 * 1024);
+    const usedPercent = Math.min((totalBytes / LIMIT_BYTES) * 100, 100);
+
+    res.json({
+      usedBytes: totalBytes,
+      usedGB: parseFloat(usedGB.toFixed(2)),
+      limitGB: LIMIT_GB,
+      limitBytes: LIMIT_BYTES,
+      usedPercent: parseFloat(usedPercent.toFixed(2)),
+    });
+  } catch (error) {
+    console.error('Error calculando almacenamiento de S3:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- CONFIGURACIÓN DE POSTGRESQL ---
 const { Pool } = require('pg');
 const pool = new Pool({
@@ -280,14 +325,62 @@ app.delete('/api/citas/:id', async (req, res) => {
 app.put('/api/citas/:id', async (req, res) => {
   const { id } = req.params;
   const { title, start, nombre, celular } = req.body;
-  const [fecha, horario] = start.split('T');
+  const [fechaStr, horarioStr] = start.split('T');
+  const nuevoHorario = horarioStr || '00:00:00';
 
   try {
+    // 1. Obtener la cita actual
+    const currentRes = await pool.query('SELECT fecha, horario, estado FROM Citas WHERE id = $1', [id]);
+    if (currentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+    const current = currentRes.rows[0];
+
+    // 2. Normalizar la fecha actual (de DB) para poder comparar (Y-m-d)
+    const currentDate = current.fecha instanceof Date ? current.fecha : new Date(current.fecha);
+    const currentDateStr = currentDate.toISOString().split('T')[0];
+
+    // 3. Normalizar horario actual (hh:mm)
+    const currentHorario = (current.horario || '00:00:00').substring(0, 5);
+    const newHorarioCompare = nuevoHorario.substring(0, 5);
+
+    // 4. Determinar si hubo cambios
+    let nuevoEstado = current.estado;
+    if (currentDateStr !== fechaStr || currentHorario !== newHorarioCompare) {
+      nuevoEstado = 'reagendado';
+    }
+
+    // 5. Actualizar en base de datos
     const result = await pool.query(
-      'UPDATE Citas SET tramite = $1, fecha = $2, horario = $3, client_nombre = $4, telefono = $5 WHERE id = $6 RETURNING *',
-      [title, fecha, horario || '00:00:00', nombre, celular, id]
+      'UPDATE Citas SET tramite = $1, fecha = $2, horario = $3, client_nombre = $4, telefono = $5, estado = $6 WHERE id = $7 RETURNING *',
+      [title, fechaStr, nuevoHorario, nombre, celular, nuevoEstado, id]
     );
-    res.json(result.rows[0]);
+    const citaActualizada = result.rows[0];
+
+    // 6. Disparar flujo n8n para notificar al cliente via WhatsApp (Reagendado o Modificado)
+    const n8nPayload = {
+      id: citaActualizada.id,
+      nombre: citaActualizada.client_nombre,
+      telefono: citaActualizada.telefono,
+      tramite: citaActualizada.tramite,
+      fecha: citaActualizada.fecha,
+      horario: citaActualizada.horario,
+      estado: citaActualizada.estado,
+      webhook_destino: 'https://notaria-server.vercel.app/api/webhook'
+    };
+
+    try {
+      await fetch(N8N_CONFIRMAR_CITA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload)
+      });
+      console.log(`✅ Flujo n8n disparado para actualización de cita ID ${id} (${citaActualizada.client_nombre})`);
+    } catch (n8nErr) {
+      console.error('⚠️ Error al llamar n8n (actualización):', n8nErr.message);
+    }
+
+    res.json(citaActualizada);
   } catch (err) {
     console.error('Error al actualizar cita:', err);
     res.status(500).json({ error: err.message });
@@ -411,6 +504,7 @@ app.get('/api/usuarios', async (req, res) => {
       nombre: row.Nombre || row.nombre,
       usuario: row.Usuario || row.usuario,
       correo: row.Correo || row.correo,
+      password: row.Contraseña || row.contraseña,
       rol: row.Rol || row.rol,
       created_at: row.created_at
     }));
@@ -445,6 +539,34 @@ app.delete('/api/usuarios/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.put('/api/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, usuario, correo, password, rol } = req.body;
+  try {
+    let result;
+    if (password) {
+      result = await pool.query(
+        'UPDATE usuarios SET "Nombre" = $1, "Usuario" = $2, "Correo" = $3, "Contraseña" = $4, "Rol" = $5 WHERE id = $6 RETURNING *',
+        [nombre, usuario, correo, password, rol, id]
+      );
+    } else {
+      result = await pool.query(
+        'UPDATE usuarios SET "Nombre" = $1, "Usuario" = $2, "Correo" = $3, "Rol" = $4 WHERE id = $5 RETURNING *',
+        [nombre, usuario, correo, rol, id]
+      );
+    }
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error al actualizar usuario:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ============================================================
 // Exportar para Vercel (serverless) y también escuchar en local
